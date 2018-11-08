@@ -12,40 +12,34 @@ public class Main {
     private static final int COUNT_LEARN = 10;
     private static final int SIZE_IMAGE = 9900;
     private static final int NUMBER_SET = 3;
-    private static int[] weights = new int[SIZE_IMAGE];
     private static final int BIAS = 5;
     private static final String PATH = "src\\main\\resources\\study_file\\";
-    private static final String PATH_TO_WEIGHTS = "src\\main\\resources\\weights.txt";
+    private static final String PATH_TO_WEIGHTS = "src\\main\\resources\\weight";
     private static final String PATH_TEST = "src\\main\\resources\\test_file\\";
     private static final String PNG = ".PNG";
-    private static final int TEST_NUMBER = 2;
+    private static final String TXT = ".TXT";
     private static Scanner scanner = new Scanner(System.in);
 
     public static void main(String[] args) throws IOException {
-        try (BufferedReader reader = new BufferedReader(new FileReader(PATH_TO_WEIGHTS))) {
-            String str;
-            int i = 0;
-            while ((str = reader.readLine()) != null) {
-                weights[i] = Integer.parseInt(str);
-                i++;
+        List<int[]> weightList = new ArrayList<>();
+        try {
+            for (int i = 0; i < COUNT_LEARN; i++) {
+                weightList.add(readFile(i));
             }
-            if (i != SIZE_IMAGE) {
-                learn();
-            }
-        } catch (FileNotFoundException e) {
-            learn();
+        }catch (FileNotFoundException e){
+            weightList = learn();
         }
 
         while (true) {
             try {
-                test();
+                test(weightList);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
 
-    private static boolean proceed(int[] number) {
+    private static boolean proceed(int[] number, int[] weights) {
         int net = 0;
         for (int i = 0; i < number.length; i++) {
             net += number[i] * weights[i];
@@ -53,7 +47,7 @@ public class Main {
         return net >= BIAS;
     }
 
-    private static void decrease(int[] number) {
+    private static void decrease(int[] number, int[] weights) {
         for (int i = 0; i < number.length; i++) {
             if (number[i] == 1) {
                 weights[i]--;
@@ -61,7 +55,7 @@ public class Main {
         }
     }
 
-    private static void increase(int[] number) {
+    private static void increase(int[] number, int[] weights) {
         for (int i = 0; i < number.length; i++) {
             if (number[i] == 1) {
                 weights[i]++;
@@ -105,51 +99,83 @@ public class Main {
         return points;
     }
 
-    private static void learn() throws IOException {
+    private static List<int[]> learn() throws IOException {
         System.out.println("Start learning");
+        List<int[]> weightList = new ArrayList<>();
         List<int[]> list = new ArrayList<>();
         for (int i = 0; i < COUNT_LEARN; i++) {
             for (int j = 0; j < NUMBER_SET; j++) {
                 list.add(readImage(PATH + i + "" + j + PNG));
             }
         }
-
-        for (int i = 0; i < 10000; i++) {
-            for (int j = 0; j < list.size(); j++) {
-                int[] number = list.get(j);
-                if (j / NUMBER_SET != TEST_NUMBER) {
-                    if (proceed(number)) {
-                        decrease(number);
-                    }
-                } else {
-                    if (!proceed(number)) {
-                        increase(number);
+        for (int k = 0; k < COUNT_LEARN; k++) {
+            int[] weights = new int[SIZE_IMAGE];
+            for (int i = 0; i < 10000; i++) {
+                for (int j = 0; j < list.size(); j++) {
+                    int[] number = list.get(j);
+                    if (j / NUMBER_SET != k) {
+                        if (proceed(number, weights)) {
+                            decrease(number, weights);
+                        }
+                    } else {
+                        if (!proceed(number, weights)) {
+                            increase(number, weights);
+                        }
                     }
                 }
             }
+            writeFile(weights, k);
+            weightList.add(weights);
         }
 
-        FileWriter fileWriter = new FileWriter(new File(PATH_TO_WEIGHTS));
+        System.out.println("Finish");
+        return weightList;
+    }
+
+    private static void writeFile(int[] weights, int number) throws IOException {
+        FileWriter fileWriter = new FileWriter(new File(PATH_TO_WEIGHTS + number + TXT));
         for (int weight : weights) {
             fileWriter.append(String.valueOf(weight));
             fileWriter.append("\n");
         }
         fileWriter.flush();
         fileWriter.close();
-
-        System.out.println("Finish");
     }
 
-    private static void test() throws IOException {
+    private static int[] readFile(int number) throws IOException {
+        int[] weights = new int[SIZE_IMAGE];
+        try (BufferedReader reader = new BufferedReader(new FileReader(PATH_TO_WEIGHTS + number + TXT))) {
+            String str;
+            int i = 0;
+            while ((str = reader.readLine()) != null) {
+                weights[i] = Integer.parseInt(str);
+                i++;
+            }
+        }
+        return weights;
+    }
+
+    private static void test(List<int[]> weightList) throws IOException {
         System.out.println("Input number");
         String string = scanner.next();
 
+        int number = -1;
         switch (string) {
             case "2":
             case "5":
             case "32":
             case "90":
-                System.out.println(string + " = " + proceed(readImage(PATH_TEST + string + PNG)));
+                int[] image = readImage(PATH_TEST + string + PNG);
+                for (int i = 0; i < weightList.size(); i++) {
+                    if (proceed(image, weightList.get(i))) {
+                        number = i;
+                    }
+                }
+                if (number != -1) {
+                    System.out.println("This image = " + number);
+                } else {
+                    System.out.println("I'm stupid robot");
+                }
                 break;
             default:
                 System.out.println("Incorrect number");
